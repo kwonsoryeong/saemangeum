@@ -20,6 +20,18 @@ const App: ()=> Node = () => {
   const [distance, setDistance] = useState(0);
   const [_watchId, setWatchId] = useState(undefined);
 
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      Geolocation.requestAuthorization('always');
+    }
+  }, []);
+
+  useEffect(() => {
+    if(location != undefined && toggle){
+      getDistance();
+    }
+  }, [location]);
+
   // 위도 경도 받아오기 START
   function start() {
     const _watchId = Geolocation.watchPosition(
@@ -30,9 +42,6 @@ const App: ()=> Node = () => {
           latitude: latitude,
           longitude: longitude,
         });*/
-        if(toggle && location){
-          getDistance();
-        }
       },
       error => {
         console.log(error);
@@ -52,38 +61,61 @@ const App: ()=> Node = () => {
   function stop() {
     Geolocation.clearWatch(_watchId);
     setLocation(undefined);
+    setPreLocation(undefined);
+    setDistance(0);
+    setToggle(false);
   }
 
   // 거리재기 START
   function distanceStart() {
-    setToggle(true);
-    setPreLocation(location);
+    if (location == undefined){
+      alert(`먼저 '시작' 버튼을 눌러주세요.`);
+    } else {
+      alert('운송을 시작합니다.');
+      setPreLocation(location);
+      setDistance(0);
+      setToggle(true);
+    }
   }
 
-  function getDistance(){
+  // 거리재기 STOP
+  function distanceStop() {
+    if (location == undefined){
+      alert(`먼저 '시작' 버튼을 눌러주세요.`);
+    } else if(toggle == false) {
+      alert(`먼저 '운송시작' 버튼을 눌러주세요.`);
+    } else {
+      alert(`운송을 종료합니다.\n측정된 거리는 ${distance}m 입니다`);
+      setToggle(false);
+    }
+  }
+
+  // 위도 경도 사이 거리 구하기
+  function getDistance(){ 
     let lat1 = preLocation.latitude;
     let lng1 = preLocation.longitude;
     let lat2 = location.latitude;
     let lng2 = location.longitude;
 
     function deg2rad(deg) {
-      return deg * (Math.PI / 180);
+      return deg * (Math.PI/180)
     }
-    var R = 6371; // Radius of the earth in km
-    var dLat = deg2rad(lat2-lat1); // deg2rad below 
-    var dLon = deg2rad(lng2-lng1); 
-    var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); var d = R * c; // Distance in km 
-    /* if(d > 10){
-      setPreLocation(location);
-    }*/
-    setDistance(d);
+    var r = 6371; //지구의 반지름(km)
+    var dLat = deg2rad(lat2-lat1);
+    var dLon = deg2rad(lng2-lng1);
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    var d = r * c; // Distance in km
+
+    let disM = Math.round(d * 1000);
+    console.log(disM);
+
+    if(disM > 10){ //가만히 있어도 5m정도의 차이가 남 => 10m 넘어섰을 때 움직이는 걸로 인식함
+      setDistance(distance + disM); // 위도 경도의 차이(이전 값 VS 변화된 값) 누적한 값
+      setPreLocation(location); //변화된 값이 기준이 되어 다음 변화값 기다림(10m 차이날 때까지)
+    }
   }
 
-  // 거리재기 STOP
-  function distanceStop() {
-    setToggle(false);
-  }
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic">
       <View>
@@ -91,7 +123,7 @@ const App: ()=> Node = () => {
           <>
             <Text>Latitude: {location.latitude}</Text>
             <Text>Longitude: {location.longitude}</Text>
-            <Text>이동거리: {distance}</Text>
+            <Text>이동거리: {distance} m</Text>
           </>
         ) : (
           <Text>시작버튼을 눌러주세요.</Text>
@@ -112,16 +144,16 @@ const App: ()=> Node = () => {
             initialRegion={{
               latitude: location.latitude,
               longitude: location.longitude,
-              latitudeDelta: 0.0922,
-              longitudeDelta: 0.0421,
+              latitudeDelta: 0.003,
+              longitudeDelta: 0.01,
             }}>
-            <MapViewDirections
+            {/*<MapViewDirections
               origin={{latitude: 35.2296677, longitude: 129.089243}}
               destination={{latitude: 35.157800, longitude: 129.0591432}}
               apikey={'AIzaSyBSZMNwCj5APs4qNUtb1QxieoK-bYT0_OY'} // insert your API Key here
               strokeWidth={4}
               strokeColor="#ff5599"
-            />
+            />*/}
             <Marker
               coordinate={{
                 latitude: location.latitude,
